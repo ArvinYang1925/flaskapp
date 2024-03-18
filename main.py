@@ -1,3 +1,4 @@
+# encoding: utf-8
 from flask import Flask, request, abort
 
 from linebot import (
@@ -9,6 +10,9 @@ from linebot.exceptions import (
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage,
 )
+
+import pymysql
+from datetime import date, timedelta
 
 app = Flask(__name__)
 
@@ -40,8 +44,66 @@ def callback():
 # 學你說話
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    message = TextSendMessage(text=event.message.text)
-    line_bot_api.reply_message(event.reply_token,message)
+    # 連線到資料庫
+    connection = pymysql.connect(
+        host='localhost',
+        user='user',
+        password='password',
+        db='new_media',
+        cursorclass=pymysql.cursors.DictCursor)
+    with connection.cursor() as cursor:
+        # 建立游標
+        cursor = connection.cursor()
+        event_text = event.message.text
+        text = ""
+        text_array = []
+        # 判斷訊息類型
+        # 2024-03-18 post inside
+        if (event_text.find("post") != -1):
+            query = event_text.split(' ')[0]
+            source = event_text.split(' ')[2]
+            if( query == 'week' ):
+                time = str(date.today() - timedelta(weeks=1))
+                sql = '''SELECT * FROM new_media.media_posts WHERE source = '{}' AND date >= '{}' '''.format(source, time)
+                cursor.execute(sql)
+                posts = cursor.fetchall()
+                for post in posts:
+                    text += "{},相關tag:{},來源:{},日期:{}\n\n".format(
+                        post['title'].strip(),
+                        post['tags'],
+                        post['source'],
+                        post['date'])
+                    # 判斷回應訊息長度
+                    if (len(text) > 1000):
+                        text_array.append(TextSendMessage(text=text))
+                        text = ""
+                    elif (post == posts[-1]):
+                        text_array.append(TextSendMessage(text=text))
+                        text = ""
+            else:
+                sql = '''SELECT * FROM new_media.media_posts WHERE source = '{}' AND date = '{}' '''.format(source, query)
+                cursor.execute(sql)
+                posts = cursor.fetchall()
+                for post in posts:
+                    text += "{},相關tag:{},來源:{},日期:{}\n\n".format(
+                        post['title'].strip(),
+                        post['tags'],
+                        post['source'],
+                        post['date'])
+                    # 判斷回應訊息長度
+                    if (len(text) > 1000):
+                        text_array.append(TextSendMessage(text=text))
+                        text = ""
+                    elif (post == posts[-1]):
+                        text_array.append(TextSendMessage(text=text))
+                        text = ""
+        else:
+            text_array.append(TextSendMessage(text='看謀啦～'))
+
+    # message = TextSendMessage(text=event.message.text)
+    line_bot_api.reply_message(event.reply_token,text_array)
+
+    connection.close()
 
 import os
 if __name__ == "__main__":
