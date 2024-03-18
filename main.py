@@ -57,6 +57,26 @@ def handle_message(event):
         event_text = event.message.text
         text = ""
         text_array = []
+        # today 快速獲取今日新聞
+        if (event_text.find("today") != -1):
+            today = str(date.today())
+            sql = '''SELECT * FROM new_media.media_posts WHERE source = '{}' AND date = '{}' '''.format('inside', today)
+            cursor.execute(sql)
+            posts = cursor.fetchall()
+            for post in posts:
+                text += "{}, 相關tag:{}, 來源:{}, 日期:{}\n\n".format(
+                    post['title'].strip(),
+                    post['tags'],
+                    post['source'],
+                    post['date'])
+                # 判斷回應訊息長度
+                if (len(text) > 1000):
+                    text_array.append(TextSendMessage(text=text))
+                    text = ""
+                elif (post == posts[-1]):
+                    text_array.append(TextSendMessage(text=text))
+                    text = ""
+
         # 判斷訊息類型
         # 2024-03-18 post inside
         if (event_text.find("post") != -1):
@@ -68,7 +88,7 @@ def handle_message(event):
                 cursor.execute(sql)
                 posts = cursor.fetchall()
                 for post in posts:
-                    text += "{},相關tag:{},來源:{},日期:{}\n\n".format(
+                    text += "{}, 相關tag:{}, 來源:{}, 日期:{}\n\n".format(
                         post['title'].strip(),
                         post['tags'],
                         post['source'],
@@ -85,7 +105,7 @@ def handle_message(event):
                 cursor.execute(sql)
                 posts = cursor.fetchall()
                 for post in posts:
-                    text += "{},相關tag:{},來源:{},日期:{}\n\n".format(
+                    text += "{}, 相關tag:{}, 來源:{}, 日期:{}\n\n".format(
                         post['title'].strip(),
                         post['tags'],
                         post['source'],
